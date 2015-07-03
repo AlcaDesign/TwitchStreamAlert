@@ -111,11 +111,11 @@ function get(uri, data, headers, method, cb, json) {
 			headers:	headers || {},		type:		method || 'GET',
 			dataType:	json != true ? json : 'jsonp',
 			success:	cb || function() { console.log('success', arguments) },
-			error:		function() { console.log('error', uri, arguments) }
+			error:		cb || function() { console.log('error', uri, arguments) }
 		});
 }
 
-function twitchGet(endpoint, d, data, cb, authToken) {
+function twitchGet(endpoint, d, data, cb, authToken, failAnyways) {
 	var ep = _.where(twitchAPIDB, { name: endpoint, auth: authToken !== undefined && authToken !== '' && authToken }),
 		headers = { Accept: 'application/vnd.twitchtv.v3+json', };
 	_.extend(data, { client_id: client_id });
@@ -123,7 +123,7 @@ function twitchGet(endpoint, d, data, cb, authToken) {
 	if(ep.length > 0) {
 		ep = ep[0];
 		return get(format('https://api.twitch.tv/kraken/%endpoint%', { endpoint: format(ep.path, d) }), data, headers, ep.method, function(data, textStatus, jqXHR) {
-					if((ep.failAt404 && jqXHR.status == 404) || (ep.mustBe200 && jqXHR.status != 200)) {
+					if(!failAnyways && ((ep.failAt404 && jqXHR.status == 404) || (ep.mustBe200 && jqXHR.status != 200))) {
 						var reason = '';
 						if(ep.failAt404 && jqXHR.status == 404)
 							reason += '(failed at 404 status)';
@@ -152,15 +152,17 @@ chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
 				for(var i in reqAPI) {
 					var apiReq = reqAPI[i];
 					(function(apiReq) {
-							deferreds.push(twitchGet(apiReq.endpoint || '', apiReq.d || {}, apiReq.data || {}, apiReq.cb || function(customData) { allData[apiReq.endpoint] = customData; }, apiReq.authToken || false));
+							deferreds.push(twitchGet(apiReq.endpoint || '', apiReq.d || {}, apiReq.data || {}, apiReq.cb || function(customData) { allData[apiReq.name || apiReq.endpoint] = customData; }, apiReq.authToken || false, true));
 						})(apiReq);
 				}
 				$.when.apply($, deferreds).then(function() {
 						sendResponse(allData);
+					}, function() {
+						sendResponse(allData);
 					});
 			}
 			else {
-				twitchGet(reqAPI.endpoint || '', reqAPI.d || {}, reqAPI.data || {}, reqAPI.cb || function(customData) { sendResponse(customData) }, reqAPI.authToken || false);
+				twitchGet(reqAPI.endpoint || '', reqAPI.d || {}, reqAPI.data || {}, reqAPI.cb || function(customData) { sendResponse(customData) }, reqAPI.authToken || false, true);
 			}
 			return true;
 		}
@@ -227,6 +229,9 @@ $(document).ready(function(e) {
 						}
 					});
 			}, 'json');
+		/*get('database/iso-languages.json', {}, {}, 'GET', function(data, textStatus, jqXHR) {
+				Languages = data;
+			}, 'json');*/
 	});
 
 chrome.storage.onChanged.addListener(loadSettings);
@@ -264,5 +269,5 @@ function receivedClick(notifID, buttonIndex) {
 chrome.notifications.onButtonClicked.addListener(receivedClick);
 chrome.notifications.onClicked.addListener(receivedClick);
 
-
+/*chrome.browserAction.onClicked.addListener(function() { chrome.runtime.openOptionsPage() });*/
 
