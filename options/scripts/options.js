@@ -1,5 +1,7 @@
 var background = chrome.extension.getBackgroundPage(),
-	Languages = {};
+	Languages = {},
+	
+	currentSearching = false;
 
 function numberFormat(number, dec, dsep, tsep) { // https://github.com/epeli/underscore.string/blob/master/numberFormat.js
   if (isNaN(number) || number == null) return '';
@@ -62,7 +64,7 @@ function addChannel(open, options) {
 		$('#addchannel-dialogue').removeClass('show');
 		setTimeout(function() {
 				loader.remove();
-			});
+			}, 500);
 	}
 	else if(open === null) {
 		console.log('Will add', options);
@@ -71,22 +73,38 @@ function addChannel(open, options) {
 
 function searchForChannel() {
 	function showSearchedChannel(data) {
-		if(data.channels.length == 0) { // Channel not found
+		var sr = $('#addchannel-dialogue-searchresults .scrollable');
+		if(!data.hasOwnProperty('channels') || data.channels.length == 0) { // Channel not found
 			console.log('Not found');
+			sr.empty();
+			var c = data.channels[i],
+				channel = $('<div/>'),
+				channelLogo = $('<div/>'),
+				channelAdd = $('<div/>'),
+				channelName = $('<div/>');
+			channelLogo.addClass('channel-logo').css('background-image', 'url(images/ic_error_outline_black_24px.svg)');
+			channelName.addClass('channel-name').css({ lineHeight: '58px', paddingBottom: 0 }).html('Nothing found.');
+			channel.addClass('channel').append(channelLogo, channelAdd, channelName);
+			sr.append(channel);
 		}
 		else {
 			console.log(arguments);
-			var sr = $('#addchannel-dialogue-searchresults .scrollable');
 			sr.empty();
-			/*
-				<div class="channel">
-					<div class="channel-logo" style="background-image: url({{logo}})"></div>
-					<div class="channel-add add"></div>
-					<div class="channel-name">{{name}}</div>
-				</div>
-			*/
+			var chans = data.channels.reduce(function(previousValue, current, i, arr) {
+					var key = current.partner ? 0 : 1; // Prioritize partners
+					if(key == 0) {
+						previousValue[key].push(current);
+					}
+					else {
+						var key2 = +(new Date(current.created_at) > 31); // Prioritize accounts older than a month
+						previousValue[key][key2].push(current);
+					}
+					return previousValue;
+				}, [[], [[],[]]]);
+			console.log(chans);
+			chans = chans[0].concat(chans[1][0].concat(chans[1][1]));
 			for(var i in data.channels) {
-				var c = data.channels[i],
+				var c = chans[i],
 					channel = $('<div/>'),
 					channelLogo = $('<div/>'),
 					channelAdd = $('<div/>'),
@@ -97,24 +115,34 @@ function searchForChannel() {
 					language = c.language.split('-')[0].toLowerCase();
 				if(c.partner) channelAttr.push('Partnered');
 				if(Languages.hasOwnProperty(language)) channelAttr.push(Languages[language].name);
-				channelName.addClass('channel-name').html((c.partner ? '<span class="verified" title="Partnered"></span>' : '') + c.display_name + '<div class="low-opacity">' + channelAttr.join(' &bull; ') + '</div>');
+				channelName.addClass('channel-name').data('name', c.name).html((c.partner ? '<span class="verified" title="Partnered"></span>' : '') + c.display_name + '<div class="low-opacity">' + channelAttr.join(' &bull; ') + '</div>');
 				channel.addClass('channel').append(channelLogo, channelAdd, channelName);
 				sr.append(channel);
 			}
 			sr.scrollTop(0);
 		}
 	}
-	if(chrome.storage) {
+	var chanName = $('#addchannel-dialogue-name').val();
+	if(chrome.storage && chanName.length > 0 && !currentSearching) {
+		var loader = $('.loader').clone();
+		currentSearching = true;
+		loader.appendTo('#addchannel-dialogue-searchresults');
+		setTimeout(function() {
+				loader.addClass('show');
+			}, 20);
 		chrome.runtime.sendMessage({ type: 'custom', api: 
 					{
 							endpoint: 'findChannels',
 							data: { q: $('#addchannel-dialogue-name').val() }
 						}
-			}, showSearchedChannel);
-	}
-	else {
-		// When designing
-		showSearchedChannel(JSON.parse('{"channel":{"mature":true,"status":"Alcabot - Custom Twitch Chat and Statistic Bot","broadcaster_language":"en","display_name":"Alca","game":"Programming","delay":0,"language":"en","_id":7676884,"name":"alca","created_at":"2009-08-10T17:32:19Z","updated_at":"2015-06-30T01:18:12Z","logo":"http://static-cdn.jtvnw.net/jtv_user_pictures/alca-profile_image-9bbabc25f6768970-300x300.png","banner":null,"video_banner":"http://static-cdn.jtvnw.net/jtv_user_pictures/alca-channel_offline_image-266ca5f76d6a51c8-640x360.png","background":null,"profile_banner":"http://static-cdn.jtvnw.net/jtv_user_pictures/alca-profile_banner-402e93e46fa2eae0-480.png","profile_banner_background_color":"#333333","partner":false,"url":"http://www.twitch.tv/alca","views":356,"followers":78,"_links":{"self":"https://api.twitch.tv/kraken/channels/alca","follows":"https://api.twitch.tv/kraken/channels/alca/follows","commercial":"https://api.twitch.tv/kraken/channels/alca/commercial","stream_key":"https://api.twitch.tv/kraken/channels/alca/stream_key","chat":"https://api.twitch.tv/kraken/chat/alca","features":"https://api.twitch.tv/kraken/channels/alca/features","subscriptions":"https://api.twitch.tv/kraken/channels/alca/subscriptions","editors":"https://api.twitch.tv/kraken/channels/alca/editors","teams":"https://api.twitch.tv/kraken/channels/alca/teams","videos":"https://api.twitch.tv/kraken/channels/alca/videos"}}}'));
+			}, function(response) {
+					currentSearching = false;
+					loader.removeClass('show');
+					setTimeout(function() {
+							loader.remove();
+						}, 500);
+					showSearchedChannel(response);
+				});
 	}
 }
 

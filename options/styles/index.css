@@ -21,19 +21,6 @@ body {
 
 #hidden {
 }
-.loader {
-	opacity: 0;
-	pointer-events: none;
-	-webkit-transition: all 500ms ease-out;
-	-moz-transition: all 500ms ease-out;
-	-ms-transition: all 500ms ease-out;
-	-o-transition: all 500ms ease-out;
-	transition: all 500ms ease-out;
-}
-.loader.show {
-	opacity: 1;
-	pointer-events: auto;
-}
 
 #header {
 	position: fixed;
@@ -194,7 +181,7 @@ input[type="checkbox"]:checked ~ .contents {
 	height: 36px;/*24px;*/
 	width: 36px;/*24px;*/
 	float: left;
-	margin: 10px 16px;/*12px;*/
+	margin: 10px;/*12px;*/
 	border: 1px solid hsla(0, 0%, 0%, .01);
 	background-size: contain;
 	background-position: center;
@@ -438,6 +425,17 @@ input[type="search"]::-webkit-search-cancel-button {
 	bottom: 0;
 	background-color: hsla(0, 0%, 0%, .15);
 	z-index: 2000;
+	opacity: 0;
+	pointer-events: none;
+	-webkit-transition: all 500ms ease-out;
+	-moz-transition: all 500ms ease-out;
+	-ms-transition: all 500ms ease-out;
+	-o-transition: all 500ms ease-out;
+	transition: all 500ms ease-out;
+}
+.loader.show {
+	opacity: 1;
+	pointer-events: auto;
 }
 .circular{
 	/*animation: rotate 2s linear infinite;*/
